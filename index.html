@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP Scanner</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            color: #333;
+        }
+
+        header {
+            background-color: #00796b;
+            color: white;
+            padding: 30px;
+            font-size: 28px;
+            text-align: center;
+            border-bottom: 5px solid #004d40;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        input, button {
+            padding: 12px;
+            margin: 10px 0;
+            font-size: 16px;
+            width: 80%;
+            max-width: 400px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+
+        button {
+            background-color: #00796b;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+
+        button:hover {
+            background-color: #004d40;
+        }
+
+        /* Loading Message */
+        .loading-message {
+            margin-top: 20px;
+            font-size: 16px;
+            color: #00796b;
+            font-weight: bold;
+            display: none; /* Initially hidden */
+        }
+
+        /* Results Section */
+        .results {
+            margin-top: 30px;
+        }
+
+        .result-group {
+            background-color: #ffffff;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-title {
+            font-size: 20px;
+            color: #00796b;
+            margin-bottom: 10px;
+        }
+
+        .ip-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .ip-item {
+            background-color: #e0f7fa;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .copy-btn {
+            background-color: #004d40;
+            color: white;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .copy-btn:hover {
+            background-color: #00796b;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    IP Scanner (True, AIS, Dtac, 3BB)
+</header>
+
+<div class="container">
+    <div class="form-group">
+        <label for="count">จำนวน IP ที่ต้องการสแกน:</label>
+        <input type="number" id="count" value="10">
+    </div>
+    <div class="form-group">
+        <label for="concurrency">จำนวนการทำงานพร้อมกัน:</label>
+        <input type="number" id="concurrency" value="50">
+    </div>
+    <div class="form-group">
+        <label for="timeout">Timeout (วินาที):</label>
+        <input type="number" id="timeout" value="1">
+    </div>
+    <button onclick="startScan()">เริ่มสแกน</button>
+</div>
+
+<div class="loading-message" id="loadingMessage">
+    กำลังแสกนความเร็วอาจช้าหากสแกนจำนวนมาก
+</div>
+
+<div class="results" id="results"></div>
+
+<script>
+    async function startScan() {
+        // แสดงข้อความกำลังสแกน
+        document.getElementById('loadingMessage').style.display = 'block';
+
+        const count = document.getElementById('count').value;
+        const concurrency = document.getElementById('concurrency').value;
+        const timeout = document.getElementById('timeout').value;
+
+        try {
+            const response = await fetch('http://127.0.0.1:5000/scan', {  // แก้ไข URL ถ้าจำเป็น
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ count: +count, concurrency: +concurrency, timeout: +timeout })
+            });
+
+            const data = await response.json();
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '';
+
+            // แสดงผลโฮสต์ออนไลน์แยกตามผู้ให้บริการ
+            for (const [provider, ips] of Object.entries(data.online_hosts)) {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'result-group';
+
+                const title = document.createElement('div');
+                title.className = 'result-title';
+                title.textContent = `โฮสต์ออนไลน์ (${provider})`;
+                groupDiv.appendChild(title);
+
+                const ipList = document.createElement('ul');
+                ipList.className = 'ip-list';
+
+                ips.forEach(({ ip, response_time }) => {
+                    const ipDiv = document.createElement('li');
+                    ipDiv.className = 'ip-item';
+                    ipDiv.innerHTML = `${ip} - ตอบสนองใน ${response_time.toFixed(2)} วินาที`;
+
+                    const copyButton = document.createElement('button');
+                    copyButton.textContent = 'คัดลอก';
+                    copyButton.className = 'copy-btn';
+                    copyButton.onclick = () => {
+                        navigator.clipboard.writeText(ip);
+                        alert(`คัดลอก IP: ${ip}`);
+                    };
+
+                    ipDiv.appendChild(copyButton);
+                    ipList.appendChild(ipDiv);
+                });
+
+                groupDiv.appendChild(ipList);
+                resultsDiv.appendChild(groupDiv);
+            }
+
+            // แสดงโฮสต์ที่ออฟไลน์
+            if (data.offline_hosts.length > 0) {
+                const offlineTitle = document.createElement('div');
+                offlineTitle.className = 'result-title';
+                offlineTitle.textContent = 'โฮสต์ที่ออฟไลน์';
+                resultsDiv.appendChild(offlineTitle);
+
+                const offlineList = document.createElement('ul');
+                offlineList.className = 'ip-list';
+
+                data.offline_hosts.forEach(ip => {
+                    const ipDiv = document.createElement('li');
+                    ipDiv.className = 'ip-item';
+                    ipDiv.innerHTML = ip;
+
+                    const copyButton = document.createElement('button');
+                    copyButton.textContent = 'คัดลอก';
+                    copyButton.className = 'copy-btn';
+                    copyButton.onclick = () => {
+                        navigator.clipboard.writeText(ip);
+                        alert(`คัดลอก IP: ${ip}`);
+                    };
+
+                    ipDiv.appendChild(copyButton);
+                    offlineList.appendChild(ipDiv);
+                });
+
+                resultsDiv.appendChild(offlineList);
+            }
+
+        } catch (error) {
+            console.error('Error:', error);
+            alert('เกิดข้อผิดพลาดในการสแกน');
+        } finally {
+            // ซ่อนข้อความกำลังสแกนเมื่อเสร็จสิ้น
+            document.getElementById('loadingMessage').style.display = 'none';
+        }
+    }
+</script>
+
+</body>
+</html>
